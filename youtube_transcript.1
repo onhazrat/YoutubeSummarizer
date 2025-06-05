@@ -23,6 +23,15 @@ Timeout in seconds for fetching the transcript. If omitted, no explicit timeout 
 .TP
 .B -h, --help
 Show help message and exit.
+.TP
+.B --log-level \fILEVEL\fP
+Set the logging level. \fILEVEL\fP can be DEBUG, INFO, WARNING, ERROR, CRITICAL. Default is WARNING.
+.TP
+.B -v, --verbose
+Enable verbose output (sets log level to INFO).
+.TP
+.B -d, --debug
+Enable debug output (sets log level to DEBUG). Overrides other logging settings.
 
 .SH EXAMPLES
 Fetch English and Farsi subtitles and print to terminal:
@@ -44,6 +53,14 @@ Fetch subtitles using a proxy:
 Fetch English subtitles with a 10-second timeout:
 .br
 .B python main.py dQw4w9WgXcQ -l en --timeout 10
+.PP
+Fetch transcript with verbose (INFO level) logging:
+.br
+.B python main.py dQw4w9WgXcQ -v
+.PP
+Fetch transcript with DEBUG level logging explicitly set:
+.br
+.B python main.py dQw4w9WgXcQ --log-level DEBUG
 
 .SH OUTPUT FORMAT
 The transcript is formatted as:
