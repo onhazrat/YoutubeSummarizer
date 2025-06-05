@@ -1,0 +1,4 @@
+youtube-transcript-api>=1.0.3
+requests>=2.0.0
+# For development/testing:
+# pytest>=7.0.0

@@ -3,7 +3,17 @@ name = "youtube-transcript-api-test"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "youtube-transcript-api>=1.0.3",
+    "requests>=2.0.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "flake8>=5.0.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
 ]
