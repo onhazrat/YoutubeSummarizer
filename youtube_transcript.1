@@ -1,0 +1,56 @@
+.TH YOUTUBE_TRANSCRIPT 1 "June 2025" "1.0" "User Commands"
+.SH NAME
+youtube_transcript \- fetch and save YouTube video transcripts from the command line
+.SH SYNOPSIS
+.B python main.py
+.RI [ OPTIONS ] " VIDEO_ID"
+.SH DESCRIPTION
+A command-line tool to fetch and save YouTube video transcripts (subtitles) in your preferred language(s).
+
+.SH OPTIONS
+.TP
+.B -l, --languages
+Comma-separated list of language codes to try (default: en,fa). Example: en,fa,de
+.TP
+.B -o, --output
+Output file path to save the transcript. If omitted, the transcript is printed to the terminal.
+.TP
+.B --proxy
+HTTP proxy URI. If omitted, no proxy is used.
+.TP
+.B -h, --help
+Show help message and exit.
+
+.SH EXAMPLES
+Fetch English and Farsi subtitles and print to terminal:
+.br
+.B python main.py dQw4w9WgXcQ
+.PP
+Fetch only German subtitles and print to terminal:
+.br
+.B python main.py dQw4w9WgXcQ -l de
+.PP
+Fetch English subtitles and save to a file:
+.br
+.B python main.py dQw4w9WgXcQ -l en -o transcript.txt
+.PP
+Fetch subtitles using a proxy:
+.br
+.B python main.py dQw4w9WgXcQ --proxy http://127.0.0.1:2081
+
+.SH OUTPUT FORMAT
+The transcript is formatted as:
+.br
+[start_time] text
+.br
+Example:
+.br
+[0.00] Never gonna give you up
+.br
+[3.50] Never gonna let you down
+
+.SH AUTHOR
+Hossein Hazrati
+
+.SH LICENSE
+MIT License
