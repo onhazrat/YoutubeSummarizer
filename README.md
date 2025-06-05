@@ -51,6 +51,15 @@ python main.py VIDEO_ID [options]
 - `--timeout`
   Timeout in seconds for fetching the transcript. If omitted, no explicit timeout is set for the request.
 
+#### Logging Options
+
+- `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`
+  Set the logging level. Default is WARNING.
+- `-v, --verbose`
+  Enable verbose output (sets log level to INFO). Overrides `--log-level` if INFO is more verbose.
+- `-d, --debug`
+  Enable debug output (sets log level to DEBUG). Overrides `--log-level` and `-v`.
+
 ### Examples
 
 Fetch the main (default) subtitle and print to terminal:
@@ -81,6 +90,23 @@ Fetch English subtitles with a 10-second timeout:
 
 ```sh
 python main.py dQw4w9WgXcQ -l en --timeout 10
+```
+
+Fetch transcript with verbose (INFO level) logging:
+
+```sh
+python main.py dQw4w9WgXcQ -v
+```
+
+Fetch transcript with DEBUG level logging:
+
+```sh
+python main.py dQw4w9WgXcQ --log-level DEBUG
+```
+
+Fetch transcript with debug flag (shortcut for DEBUG level):
+```sh
+python main.py dQw4w9WgXcQ -d
 ```
 
 ## Proxy Configuration

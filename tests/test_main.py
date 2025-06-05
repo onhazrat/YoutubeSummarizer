@@ -6,6 +6,7 @@ from requests.exceptions import Timeout as RequestsTimeout
 from requests.exceptions import RequestException  # Added
 import main as cli_main  # Added
 import argparse  # Added
+import logging  # Added for logging level constants
 from youtube_transcript_api import (  # Corrected import path
     VideoUnavailable,
     TranscriptsDisabled,
@@ -19,6 +20,29 @@ from youtube_transcript_api import (  # Corrected import path
 # Define a type for transcript items for clarity in tests
 TranscriptItem = Dict[str, Union[str, float]]
 MockTranscriptResult = List[TranscriptItem]
+
+
+# Default args for mocking parse_args
+def_args_dict = {  # Reformatted to be multi-line
+    "video_id": "test_id",
+    "languages": None,
+    "output": None,
+    "proxy": None,
+    "timeout": None,
+    "log_level": "WARNING",
+    "log_level_flag": None,
+}
+
+
+# Helper to create Namespace, so we can easily override parts for specific tests
+def create_args_namespace(**overrides: Any) -> argparse.Namespace:
+    return argparse.Namespace(**{**def_args_dict, **overrides})
+
+
+sample_transcript_data: MockTranscriptResult = [  # Added type hint
+    {"text": "Hello world", "start": 0.0, "duration": 1.0}
+]
+formatted_sample_transcript: str = "[0.00] Hello world"  # Added type hint
 
 
 # Test for timeout occurrence
@@ -191,18 +215,7 @@ def test_fetch_transcript_with_proxy_only(
 
 # --- Tests for main() function ---
 # Imports moved to the top
-
-
-def_args = argparse.Namespace(
-    video_id="test_id",
-    languages=None,
-    output=None,
-    proxy=None,
-    timeout=None,
-)
-
-sample_transcript_data = [{"text": "Hello world", "start": 0.0, "duration": 1.0}]
-formatted_sample_transcript = "[0.00] Hello world"
+# Old def_args removed, sample_transcript_data and formatted_sample_transcript are already defined with type hints above.
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -210,16 +223,20 @@ formatted_sample_transcript = "[0.00] Hello world"
 def test_main_video_unavailable(
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    mock_parse_args.return_value = def_args
-    mock_fetch_transcript.side_effect = VideoUnavailable(def_args.video_id)
+    mock_parse_args.return_value = create_args_namespace()
+    mock_fetch_transcript.side_effect = VideoUnavailable(def_args_dict["video_id"])
     with pytest.raises(SystemExit) as e_info:
         cli_main.main()
     assert e_info.value.code == 1
-    captured = capsys.readouterr()
-    assert "Error: Video 'test_id' is unavailable" in captured.err
-    assert "Please check the video ID" in captured.err
+    # Assuming DEBUG logs from main() might also be present if default test level is low enough
+    assert len(caplog.records) >= 1
+    error_record = next(
+        r for r in reversed(caplog.records) if r.levelname == "ERROR"
+    )  # Get the last ERROR
+    assert "Video 'test_id' is unavailable" in error_record.message
+    assert "Please check the video ID" in error_record.message
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -227,16 +244,17 @@ def test_main_video_unavailable(
 def test_main_transcripts_disabled(
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    mock_parse_args.return_value = def_args
-    mock_fetch_transcript.side_effect = TranscriptsDisabled(def_args.video_id)
+    mock_parse_args.return_value = create_args_namespace()
+    mock_fetch_transcript.side_effect = TranscriptsDisabled(def_args_dict["video_id"])
     with pytest.raises(SystemExit) as e_info:
         cli_main.main()
     assert e_info.value.code == 1
-    captured = capsys.readouterr()
-    assert "Error: Transcripts are disabled for video 'test_id'" in captured.err
-    assert "disabled by the uploader" in captured.err
+    assert len(caplog.records) >= 1
+    error_record = next(r for r in reversed(caplog.records) if r.levelname == "ERROR")
+    assert "Transcripts are disabled for video 'test_id'" in error_record.message
+    assert "disabled by the uploader" in error_record.message
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -244,16 +262,18 @@ def test_main_transcripts_disabled(
 def test_main_no_transcript_found(
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    mock_parse_args.return_value = def_args
-    # NoTranscriptFound constructor for v1.0.3 seems to be: video_id, requested_language_codes, transcript_data_dict
-    mock_fetch_transcript.side_effect = NoTranscriptFound(def_args.video_id, ["en"], {})
+    mock_parse_args.return_value = create_args_namespace()
+    mock_fetch_transcript.side_effect = NoTranscriptFound(
+        def_args_dict["video_id"], ["en"], {}
+    )
     with pytest.raises(SystemExit) as e_info:
         cli_main.main()
     assert e_info.value.code == 1
-    captured = capsys.readouterr()
-    assert "Error: Could not find a transcript for video 'test_id'" in captured.err
+    assert len(caplog.records) >= 1
+    error_record = next(r for r in reversed(caplog.records) if r.levelname == "ERROR")
+    assert "Could not find a transcript for video 'test_id'" in error_record.message
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -261,27 +281,21 @@ def test_main_no_transcript_found(
 def test_main_no_transcript_found_with_langs(
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    args_with_langs = argparse.Namespace(
-        video_id="test_id_langs",
-        languages="es,fr",
-        output=None,
-        proxy=None,
-        timeout=None,
+    video_id = "test_id_langs"
+    langs = ["es", "fr"]
+    mock_parse_args.return_value = create_args_namespace(
+        video_id=video_id, languages=",".join(langs)
     )
-    mock_parse_args.return_value = args_with_langs
-    mock_fetch_transcript.side_effect = NoTranscriptFound(
-        args_with_langs.video_id, ["es", "fr"], {}
-    )
+    mock_fetch_transcript.side_effect = NoTranscriptFound(video_id, langs, {})
     with pytest.raises(SystemExit) as e_info:
         cli_main.main()
     assert e_info.value.code == 1
-    captured = capsys.readouterr()
-    assert (
-        "Error: Could not find a transcript for video 'test_id_langs'" in captured.err
-    )
-    assert "Attempted languages: es, fr" in captured.err
+    assert len(caplog.records) >= 1
+    error_record = next(r for r in reversed(caplog.records) if r.levelname == "ERROR")
+    assert f"Could not find a transcript for video '{video_id}'" in error_record.message
+    assert f"Tried languages: {', '.join(langs)}." in error_record.message
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -289,16 +303,17 @@ def test_main_no_transcript_found_with_langs(
 def test_main_network_timeout(
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    mock_parse_args.return_value = def_args
+    mock_parse_args.return_value = create_args_namespace()
     mock_fetch_transcript.side_effect = RequestsTimeout("Connection timed out")
     with pytest.raises(SystemExit) as e_info:
         cli_main.main()
     assert e_info.value.code == 1
-    captured = capsys.readouterr()
-    assert "Error: A network issue occurred" in captured.err
-    assert "Connection timed out" in captured.err
+    assert len(caplog.records) >= 1
+    error_record = next(r for r in reversed(caplog.records) if r.levelname == "ERROR")
+    assert "A network issue occurred" in error_record.message
+    assert "Connection timed out" in error_record.message
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -306,16 +321,17 @@ def test_main_network_timeout(
 def test_main_network_request_exception(
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    mock_parse_args.return_value = def_args
+    mock_parse_args.return_value = create_args_namespace()
     mock_fetch_transcript.side_effect = RequestException("Some other network problem")
     with pytest.raises(SystemExit) as e_info:
         cli_main.main()
     assert e_info.value.code == 1
-    captured = capsys.readouterr()
-    assert "Error: A network issue occurred" in captured.err
-    assert "Some other network problem" in captured.err
+    assert len(caplog.records) >= 1
+    error_record = next(r for r in reversed(caplog.records) if r.levelname == "ERROR")
+    assert "A network issue occurred" in error_record.message
+    assert "Some other network problem" in error_record.message
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -323,19 +339,16 @@ def test_main_network_request_exception(
 def test_main_request_blocked(  # Renamed test
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    mock_parse_args.return_value = def_args
-    mock_fetch_transcript.side_effect = RequestBlocked(
-        def_args.video_id
-    )  # Use RequestBlocked
+    mock_parse_args.return_value = create_args_namespace()
+    mock_fetch_transcript.side_effect = RequestBlocked(def_args_dict["video_id"])
     with pytest.raises(SystemExit) as e_info:
         cli_main.main()
     assert e_info.value.code == 1
-    captured = capsys.readouterr()
-    assert (
-        "Error: Your request was blocked by YouTube" in captured.err
-    )  # Updated assertion
+    assert len(caplog.records) >= 1
+    error_record = next(r for r in reversed(caplog.records) if r.levelname == "ERROR")
+    assert "Your request was blocked by YouTube" in error_record.message
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -343,15 +356,18 @@ def test_main_request_blocked(  # Renamed test
 def test_main_generic_exception(
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    mock_parse_args.return_value = def_args
+    mock_parse_args.return_value = create_args_namespace()
     mock_fetch_transcript.side_effect = Exception("A very generic error")
     with pytest.raises(SystemExit) as e_info:
         cli_main.main()
     assert e_info.value.code == 1
-    captured = capsys.readouterr()
-    assert "An unexpected error occurred. Details: A very generic error" in captured.err
+    assert len(caplog.records) >= 1
+    error_record = next(r for r in reversed(caplog.records) if r.levelname == "ERROR")
+    assert error_record.levelname == "ERROR"
+    assert "An unexpected error occurred." in error_record.message
+    assert "A very generic error" in error_record.message
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -360,8 +376,9 @@ def test_main_successful_stdout(
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
     capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,  # Added caplog
 ) -> None:
-    mock_parse_args.return_value = def_args
+    mock_parse_args.return_value = create_args_namespace()  # Use helper
     mock_fetch_transcript.return_value = sample_transcript_data
 
     # No SystemExit is raised for success
@@ -369,7 +386,10 @@ def test_main_successful_stdout(
 
     captured = capsys.readouterr()
     assert captured.out.strip() == formatted_sample_transcript
-    assert captured.err == ""
+
+    # Check logs based on default log level (WARNING)
+    cli_log_records = [r for r in caplog.records if r.name == "youtube_transcript_cli"]
+    assert not any(r.levelno < logging.WARNING for r in cli_log_records)
 
 
 @patch("argparse.ArgumentParser.parse_args")
@@ -379,32 +399,138 @@ def test_main_successful_file_output(
     mock_open: MagicMock,
     mock_fetch_transcript: MagicMock,
     mock_parse_args: MagicMock,
+    caplog: pytest.LogCaptureFixture,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    args_with_output = argparse.Namespace(
-        video_id="test_id_file",
-        languages=None,
-        output="out.txt",
-        proxy=None,
-        timeout=None,
+    video_id = "test_id_file"
+    output_file = "out.txt"
+    # Set log_level_flag to INFO to ensure the "saved" message is logged and captured
+    mock_parse_args.return_value = create_args_namespace(
+        video_id=video_id, output=output_file, log_level_flag="INFO"
     )
-    mock_parse_args.return_value = args_with_output
     mock_fetch_transcript.return_value = sample_transcript_data
 
     # Configure mock_open explicitly for context manager behavior
-    mock_f_object = MagicMock()  # This will be 'f' in 'with open(...) as f:'
-    # mock_f_object.write will be created as a MagicMock on first attribute access by the code under test
+    mock_f_object = MagicMock()
     mock_context_manager = MagicMock()
     mock_context_manager.__enter__.return_value = mock_f_object
-    mock_open.return_value = (
-        mock_context_manager  # open(...) returns the context manager
-    )
+    mock_open.return_value = mock_context_manager
 
-    cli_main.main()  # Should not raise SystemExit
+    cli_main.main()
 
-    mock_open.assert_called_once_with("out.txt", "w", encoding="utf-8")
+    mock_open.assert_called_once_with(output_file, "w", encoding="utf-8")
     mock_f_object.write.assert_called_once_with(formatted_sample_transcript)
 
-    captured = capsys.readouterr()
-    assert "Transcript saved to out.txt" in captured.out  # Check for Rich styled output
-    assert captured.err == ""
+    # Check log for success message
+    # Expect DEBUG for args, INFO for fetching, INFO for saved (if log level is INFO)
+    assert (
+        len(caplog.records) >= 3
+    )  # DEBUG Parsed args, DEBUG Effective log level, INFO Fetching, INFO Saved
+
+    cli_log_records = [r for r in caplog.records if r.name == "youtube_transcript_cli"]
+    info_records = [r for r in cli_log_records if r.levelname == "INFO"]
+
+    assert (
+        len(info_records) == 2
+    )  # "Fetching..." and "Transcript successfully saved..."
+    assert (
+        f"Fetching transcript for video ID: [bold]{video_id}[/bold]"
+        in info_records[0].message
+    )
+    assert (
+        f"Transcript successfully saved to [cyan]{output_file}[/cyan]"
+        in info_records[1].message
+    )
+
+    # Check stdout is empty
+    captured_stdout = capsys.readouterr().out
+    assert captured_stdout == ""
+
+
+# Corrected and de-duplicated verbosity tests start here (lines after the removed block)
+# Tests for different verbosity levels
+@patch("argparse.ArgumentParser.parse_args")
+@patch("main.fetch_transcript")
+def test_main_log_level_default_warning(
+    mock_fetch_transcript: MagicMock,
+    mock_parse_args: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    mock_parse_args.return_value = create_args_namespace(
+        log_level="WARNING", log_level_flag=None
+    )
+    mock_fetch_transcript.return_value = sample_transcript_data
+
+    cli_main.main()
+
+    cli_log_records = [r for r in caplog.records if r.name == "youtube_transcript_cli"]
+    for record in cli_log_records:
+        assert record.levelno >= logging.WARNING
+
+    mock_fetch_transcript.side_effect = VideoUnavailable(def_args_dict["video_id"])
+    with pytest.raises(SystemExit):
+        caplog.clear()
+        cli_main.main()
+    assert any(
+        r.levelname == "ERROR" and "Video 'test_id' is unavailable" in r.message
+        for r in caplog.records
+        if r.name == "youtube_transcript_cli"  # Ensure we check our logger
+    )
+
+    captured = capsys.readouterr()  # From the first successful cli_main.main() call
+    assert captured.out.strip() == formatted_sample_transcript
+
+
+@patch("argparse.ArgumentParser.parse_args")
+@patch("main.fetch_transcript")
+def test_main_log_level_verbose_info(
+    mock_fetch_transcript: MagicMock,
+    mock_parse_args: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_parse_args.return_value = create_args_namespace(log_level_flag="INFO")
+    mock_fetch_transcript.return_value = sample_transcript_data
+    cli_main.main()
+    cli_logs = [r for r in caplog.records if r.name == "youtube_transcript_cli"]
+    assert any(
+        r.levelname == "INFO" and "Fetching transcript for video ID:" in r.message
+        for r in cli_logs
+    )
+    assert not any(
+        r.levelname == "DEBUG" and "Fetching transcript for video_id=" in r.message
+        for r in cli_logs
+    )
+    assert not any(
+        r.levelname == "DEBUG"
+        and ("Parsed arguments:" in r.message or "Effective log level" in r.message)
+        for r in cli_logs
+    )
+
+
+@patch("argparse.ArgumentParser.parse_args")
+@patch("main.fetch_transcript")
+def test_main_log_level_debug(
+    mock_fetch_transcript: MagicMock,
+    mock_parse_args: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_parse_args.return_value = create_args_namespace(log_level_flag="DEBUG")
+    mock_fetch_transcript.return_value = sample_transcript_data
+    cli_main.main()
+    cli_logs = [r for r in caplog.records if r.name == "youtube_transcript_cli"]
+    assert any(
+        r.levelname == "DEBUG" and "Parsed arguments:" in r.message for r in cli_logs
+    )
+    assert any(
+        r.levelname == "DEBUG" and "Effective log level set to: DEBUG" in r.message
+        for r in cli_logs
+    )
+    assert any(
+        r.levelname == "DEBUG" and "Fetching transcript for video_id=" in r.message
+        for r in cli_logs
+    )
+    assert any(
+        r.levelname == "INFO" and "Fetching transcript for video ID:" in r.message
+        for r in cli_logs
+    )
