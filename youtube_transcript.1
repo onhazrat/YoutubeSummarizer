@@ -18,6 +18,9 @@ Output file path to save the transcript. If omitted, the transcript is printed t
 .B --proxy
 HTTP proxy URI. If omitted, no proxy is used.
 .TP
+.B --timeout
+Timeout in seconds for fetching the transcript. If omitted, no explicit timeout is set for the request.
+.TP
 .B -h, --help
 Show help message and exit.
 
@@ -37,6 +40,10 @@ Fetch English subtitles and save to a file:
 Fetch subtitles using a proxy:
 .br
 .B python main.py dQw4w9WgXcQ --proxy http://127.0.0.1:2081
+.PP
+Fetch English subtitles with a 10-second timeout:
+.br
+.B python main.py dQw4w9WgXcQ -l en --timeout 10
 
 .SH OUTPUT FORMAT
 The transcript is formatted as:

@@ -9,6 +9,7 @@ A simple command-line tool to fetch and save YouTube video transcripts (subtitle
 - Outputs transcript to the terminal or saves to a file
 - Optional HTTP proxy support
 - Includes a man page for command-line help
+- Enhanced, user-friendly error reporting using `rich`
 
 ## Requirements
 - Python 3.13+
@@ -47,6 +48,9 @@ python main.py VIDEO_ID [options]
 - `--proxy`  
   HTTP proxy URI. If omitted, no proxy is used.
 
+- `--timeout`
+  Timeout in seconds for fetching the transcript. If omitted, no explicit timeout is set for the request.
+
 ### Examples
 
 Fetch the main (default) subtitle and print to terminal:
@@ -71,6 +75,12 @@ Fetch subtitles using a proxy:
 
 ```sh
 python main.py dQw4w9WgXcQ --proxy http://127.0.0.1:2081
+```
+
+Fetch English subtitles with a 10-second timeout:
+
+```sh
+python main.py dQw4w9WgXcQ -l en --timeout 10
 ```
 
 ## Proxy Configuration
@@ -110,3 +120,19 @@ man youtube_transcript
 ## License
 
 MIT License
+
+## Contributing
+
+Contributions are welcome! To ensure consistency and maintain code quality, please adhere to the following guidelines:
+
+- **Formatting**: Code should be formatted with `black`. Run `python -m black .` before committing.
+- **Linting**: Code should pass `flake8` linting. Run `python -m flake8 .` to check for issues.
+  - *Note*: There are a few persistent E501 (line too long) errors that `black` does not resolve under the 99-character limit set for `flake8`. These specific instances are currently acknowledged.
+- **Type Checking**: Code should pass `mypy` type checking. Run `python -m mypy .` to verify.
+- **Testing**:
+    - New features should include unit tests.
+    - All tests should pass. Run `pytest` to execute the test suite.
+- **Development Dependencies**: To install all development dependencies, including testing tools, linters, and formatters, run:
+  ```sh
+  pip install -e .[test]
+  ```
